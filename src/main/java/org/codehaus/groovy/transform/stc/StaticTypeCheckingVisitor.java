@@ -1127,7 +1127,7 @@ public class StaticTypeCheckingVisitor extends ClassCodeVisitorSupport {
     }
 
     private void adjustGenerics(final ClassNode source, final ClassNode target) {
-        GenericsType[] genericsTypes = source.getGenericsTypes();
+        GenericsType[] genericsTypes = source.getGenericsTypes(), targetRedirectGenericsTypes = target.redirect().getGenericsTypes();
         if (genericsTypes == null) { // Map foo = new HashMap<>()
             genericsTypes = target.redirect().getGenericsTypes().clone();
             for (int i = 0, n = genericsTypes.length; i < n; i += 1) {
@@ -1137,15 +1137,31 @@ public class StaticTypeCheckingVisitor extends ClassCodeVisitorSupport {
                         ? gt.getUpperBounds()[0] : gt.getType().redirect();
                 genericsTypes[i] = cn.getPlainNodeReference().asGenericsType();
             }
-        } else {
-            genericsTypes = genericsTypes.clone();
-            for (int i = 0, n = genericsTypes.length; i < n; i += 1) {
-                GenericsType gt = genericsTypes[i];
-                genericsTypes[i] = new GenericsType(gt.getType(),
-                        gt.getUpperBounds(), gt.getLowerBound());
-                genericsTypes[i].setWildcard(gt.isWildcard()); // GROOVY-10310
+        } else if (targetRedirectGenericsTypes != null && genericsTypes.length > targetRedirectGenericsTypes.length) {
+            GenericsType[] genericsRedirectTypes = source.redirect().getGenericsTypes(), out = new GenericsType[targetRedirectGenericsTypes.length];
+            for (int i = 0; i < targetRedirectGenericsTypes.length; i++) {
+                for (int j = 0; j < genericsRedirectTypes.length; j++) {
+                    if (targetRedirectGenericsTypes[i].getName().equals(genericsRedirectTypes[j].getName())) {
+                        GenericsType gt = genericsTypes[j];
+                        out[i] = new GenericsType(gt.getType(),
+                            gt.getUpperBounds(), gt.getLowerBound());
+                        out[i].setWildcard(gt.isWildcard());
+                        break;
+                    }
+                }
             }
+            target.setGenericsTypes(out);
+            return;
         }
+         else   {
+                genericsTypes = genericsTypes.clone();
+                for (int i = 0, n = genericsTypes.length; i < n; i += 1) {
+                    GenericsType gt = genericsTypes[i];
+                    genericsTypes[i] = new GenericsType(gt.getType(),
+                        gt.getUpperBounds(), gt.getLowerBound());
+                    genericsTypes[i].setWildcard(gt.isWildcard()); // GROOVY-10310
+                }
+            }
         target.setGenericsTypes(genericsTypes);
     }
 
